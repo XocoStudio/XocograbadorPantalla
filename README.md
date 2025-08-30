@@ -2,6 +2,9 @@
 
 ¡Bienvenido a Grabador de Pantalla Pro! Esta es una potente herramienta que se ejecuta completamente en tu navegador para grabar, editar y gestionar capturas de pantalla de forma rápida, privada y sencilla.
 
+
+> 👉 [**Accede a Xoco Subtitle Player Pro aquí**](https://xocostudio.github.io/XocograbadorPantalla/) 👈
+
 A continuación, se detallan todas las funciones disponibles.
 
 ## 1. Controles de Grabación
