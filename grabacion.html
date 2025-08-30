@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabador de Pantalla Pro</title>
+    <!-- Se añade la librería JSZip para la funcionalidad "Descargar Todo" -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #667eea 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .app-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 32px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 300;
+        }
+
+        .subtitle {
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        .controls-section, .preview-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border: none;
+            color: white;
+            padding: 15px 25px;
+            font-size: 16px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn.recording {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn.pause {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .status {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 14px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .timer {
+            font-size: 2em;
+            font-weight: 600;
+            color: #ff6b6b;
+            text-align: center;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .preview-container {
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+            min-height: 200px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .preview-video {
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff6b6b;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .settings {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .setting-group {
+            margin: 15px 0;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .setting-group select,
+        .setting-group input,
+        .setting-group textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .setting-group select:focus,
+        .setting-group input:focus,
+        .setting-group textarea:focus {
+            outline: none;
+            border-color: #4ecdc4;
+            box-shadow: 0 0 10px rgba(78, 205, 196, 0.3);
+        }
+
+        .setting-group select option {
+            background: #333;
+            color: white;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            accent-color: #4ecdc4;
+            transform: scale(1.2);
+        }
+
+        .audio-levels {
+            display: none;
+            margin: 10px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .level-meter {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .level-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #44a08d, #f39c12, #e74c3c);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .downloads {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        .downloads-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .downloads-header-actions {
+            display: none; /* Se muestra con JS */
+            gap: 10px;
+        }
+        
+        .batch-action-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 15px;
+            font-size: 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .batch-action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .download-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .download-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .download-info {
+            flex: 1;
+            margin-right: 15px;
+            word-break: break-all;
+        }
+
+        .download-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .download-details {
+            font-size: 12px;
+            opacity: 0.7;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .download-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .download-link, .delete-btn {
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .download-link {
+             background: #4ecdc4;
+        }
+        
+        .delete-btn {
+            background: #ff6b6b;
+        }
+
+        .download-link:hover {
+            background: #44a08d;
+            transform: translateY(-2px);
+        }
+        
+        .delete-btn:hover {
+            background: #ee5a24;
+            transform: translateY(-2px);
+        }
+
+        .error {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .success {
+            background: rgba(78, 205, 196, 0.2);
+            color: #4ecdc4;
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+
+        .warning {
+            background: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+            border: 1px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #4ecdc4;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .keyboard-shortcuts {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .shortcut-key {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .advanced-settings {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .toggle-advanced {
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-advanced:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #4ecdc4;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="app-icon">🎥</div>
+            <h1>Grabador de Pantalla Pro</h1>
+            <p class="subtitle">Captura profesional de pantalla con audio y configuraciones avanzadas</p>
+        </div>
+
+        <div class="main-content">
+            <div class="controls-section">
+                <h3 class="section-title">🎮 Controles de Grabación</h3>
+                
+                <div class="controls">
+                    <button id="startBtn" class="btn">
+                        <span>▶️</span> Iniciar Grabación
+                    </button>
+                    <button id="pauseBtn" class="btn pause" disabled>
+                        <span>⏸️</span> Pausar
+                    </button>
+                    <button id="stopBtn" class="btn" disabled>
+                        <span>⏹️</span> Detener
+                    </button>
+                </div>
+
+                <div class="timer" id="timer" style="display: none;">00:00</div>
+
+                <div class="status" id="status">
+                    ✨ Listo para grabar. Configura las opciones y haz clic en "Iniciar Grabación".
+                </div>
+
+                <div class="stats" id="stats" style="display: none;">
+                    <div class="stat-item">
+                        <div class="stat-value" id="fileSize">0 MB</div>
+                        <div class="stat-label">Tamaño Estimado</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="fps">0</div>
+                        <div class="stat-label">FPS Objetivo</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="bitrate">0</div>
+                        <div class="stat-label">Bitrate (kbps)</div>
+                    </div>
+                </div>
+
+                <div class="audio-levels" id="audioLevels">
+                    <h4>📊 Niveles de Audio</h4>
+                    <div>
+                        <label>Sistema:</label>
+                        <div class="level-meter">
+                            <div class="level-fill" id="systemAudioLevel"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <label>Micrófono:</label>
+                        <div class="level-meter">
+                            <div class="level-fill" id="micAudioLevel"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-section">
+                <h3 class="section-title">👁️ Vista Previa</h3>
+                <div class="preview-container" id="previewContainer">
+                    <video id="previewVideo" class="preview-video" autoplay muted></video>
+                    <div class="recording-indicator" id="recordingIndicator">🔴 GRABANDO</div>
+                </div>
+                <div style="text-align: center; padding: 40px; opacity: 0.6;" id="previewPlaceholder">
+                    <div style="font-size: 48px; margin-bottom: 20px;">📺</div>
+                    <p>La vista previa aparecerá aquí durante la grabación</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings">
+            <h3 class="section-title">⚙️ Configuración de Grabación</h3>
+            
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label for="videoQuality">📹 Calidad de Video (FPS):</label>
+                    <select id="videoQuality">
+                        <option value="15">15 FPS - Básica (Menor tamaño)</option>
+                        <option value="30" selected>30 FPS - Estándar (Recomendado)</option>
+                        <option value="60">60 FPS - Alta (Archivos grandes)</option>
+                        <option value="120">120 FPS - Ultra (Solo para gaming)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="videoFormat">💾 Formato de Video:</label>
+                    <select id="videoFormat">
+                        <option value="video/webm;codecs=vp8,opus">WebM VP8 + Opus (Compatible)</option>
+                        <option value="video/webm;codecs=vp9,opus" selected>WebM VP9 + Opus (Mejor calidad)</option>
+                        <option value="video/webm;codecs=h264,opus">WebM H264 + Opus (Universal)</option>
+                        <option value="video/mp4">MP4 (Si está disponible)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="videoBitrate">📊 Bitrate de Video (Mbps):</label>
+                    <select id="videoBitrate">
+                        <option value="1000000">1 Mbps - Básico</option>
+                        <option value="2500000">2.5 Mbps - Estándar</option>
+                        <option value="5000000" selected>5 Mbps - Alta calidad</option>
+                        <option value="8000000">8 Mbps - Muy alta</option>
+                        <option value="15000000">15 Mbps - Ultra (4K)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="resolution">📐 Resolución:</label>
+                    <select id="resolution" disabled>
+                        <option value="auto" selected>Automática (Resolución original)</option>
+                        <option value="1920x1080">1920x1080 (Full HD)</option>
+                        <option value="1280x720">1280x720 (HD)</option>
+                        <option value="2560x1440">2560x1440 (2K)</option>
+                        <option value="3840x2160">3840x2160 (4K)</option>
+                    </select>
+                </div>
+            </div>
+
+            <h4 style="margin: 25px 0 15px 0;">🎵 Configuración de Audio</h4>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="captureSystemAudio" checked>
+                <label for="captureSystemAudio">Capturar audio del sistema (aplicaciones, música, etc.)</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="captureMicrophone">
+                <label for="captureMicrophone">Capturar micrófono (narración)</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="suppressEcho" checked>
+                <label for="suppressEcho">Suprimir eco y cancelar ruido</label>
+            </div>
+
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label for="audioQuality">🎧 Calidad de Audio:</label>
+                    <select id="audioQuality" disabled>
+                        <option value="8000">8 kHz - Voz básica</option>
+                        <option value="22050">22 kHz - Estándar</option>
+                        <option value="44100" selected>44.1 kHz - Calidad CD</option>
+                        <option value="48000">48 kHz - Profesional</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="microphoneDevice">🎤 Dispositivo de Micrófono:</label>
+                    <select id="microphoneDevice">
+                        <option value="default">Micrófono predeterminado</option>
+                    </select>
+                </div>
+            </div>
+
+            <h4 style="margin: 25px 0 15px 0;">📁 Configuración de Archivo</h4>
+            
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label for="filename">📝 Nombre del archivo:</label>
+                    <input type="text" id="filename" placeholder="grabacion_pantalla" value="grabacion_pantalla">
+                </div>
+
+                <div class="setting-group">
+                    <label for="saveLocation" disabled>📂 Carpeta de descarga:</label>
+                    <select id="saveLocation">
+                        <option value="downloads">Descargas (Predeterminado)</option>
+                        <option value="desktop" disabled>Escritorio (No disponible)</option>
+                        <option value="documents" disabled>Documentos (No disponible)</option>
+                        <option value="custom" disabled>Personalizada (No disponible)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoSave" checked>
+                <label for="autoSave">Guardar automáticamente al detener</label>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="showCountdown" checked>
+                <label for="showCountdown">Mostrar cuenta regresiva de 3 segundos</label>
+            </div>
+
+            <button class="toggle-advanced" id="toggleAdvancedBtn">
+                ⚡ Mostrar configuración avanzada
+            </button>
+
+            <div class="advanced-settings" id="advancedSettings">
+                <h4 style="margin: 20px 0 15px 0;">⚡ Configuración Avanzada</h4>
+                
+                <div class="settings-grid">
+                    <div class="setting-group">
+                        <label for="chunkSize">📦 Tamaño de chunk (ms):</label>
+                        <select id="chunkSize">
+                            <option value="100">100ms - Tiempo real</option>
+                            <option value="1000" selected>1000ms - Estándar</option>
+                            <option value="5000">5000ms - Archivos grandes</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="maxDuration">⏱️ Duración máxima (minutos):</label>
+                        <input type="number" id="maxDuration" min="1" max="180" value="60" placeholder="60">
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="hardwareAcceleration" disabled>
+                    <label for="hardwareAcceleration">Usar aceleración por hardware (controlado por el navegador)</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="captureMouseClicks" disabled>
+                    <label for="captureMouseClicks">Resaltar clics del mouse (próximamente)</label>
+                </div>
+
+                <div class="setting-group">
+                    <label for="hotkeys">⌨️ Configurar atajos de teclado:</label>
+                    <textarea id="hotkeys" rows="3" placeholder="Personalizar atajos de teclado..." readonly>F9: Iniciar/Detener grabación
+F10: Pausar/Reanudar
+F11: Captura de pantalla (próximamente)</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="keyboard-shortcuts">
+            <h4>⌨️ Atajos de Teclado</h4>
+            <div class="shortcut-item">
+                <span>Iniciar/Detener grabación</span>
+                <span class="shortcut-key">F9</span>
+            </div>
+            <div class="shortcut-item">
+                <span>Pausar/Reanudar</span>
+                <span class="shortcut-key">F10</span>
+            </div>
+            <div class="shortcut-item">
+                <span>Captura de pantalla</span>
+                <span class="shortcut-key">F11</span>
+            </div>
+            <div class="shortcut-item">
+                <span>Abrir configuración</span>
+                <span class="shortcut-key">Ctrl + ,</span>
+            </div>
+        </div>
+
+        <div class="downloads" id="downloadsContainer">
+            <div class="downloads-header">
+                <h3 class="section-title" style="margin-bottom: 0;">📁 Archivos Grabados</h3>
+                <div class="downloads-header-actions" id="downloadsHeaderActions">
+                    <button class="batch-action-btn" id="downloadAllBtn"><span>📦</span> Descargar Todo</button>
+                    <button class="batch-action-btn" id="deleteAllBtn"><span>🗑️</span> Eliminar Todo</button>
+                </div>
+            </div>
+            <div id="downloadList"></div>
+        </div>
+    </div>
+
+    <script>
+        function toggleAdvancedSettings() {
+            const advancedSettings = document.getElementById('advancedSettings');
+            const toggleButton = document.getElementById('toggleAdvancedBtn');
+            if (advancedSettings.style.display === 'none' || advancedSettings.style.display === '') {
+                advancedSettings.style.display = 'block';
+                toggleButton.textContent = '⚡ Ocultar configuración avanzada';
+            } else {
+                advancedSettings.style.display = 'none';
+                toggleButton.textContent = '⚡ Mostrar configuración avanzada';
+            }
+        }
+
+        class ScreenRecorderPro {
+            constructor() {
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.displayStream = null;
+                this.microphoneStream = null;
+                this.combinedStream = null;
+                this.startTime = null;
+                this.timerInterval = null;
+                this.statsInterval = null;
+                this.isPaused = false;
+                this.pausedTime = 0;
+                this.timePaused = 0;
+                this.recordedBlobs = new Map();
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.setupKeyboardShortcuts();
+                this.loadMicrophoneDevices();
+                this.checkBrowserSupport();
+            }
+
+            initializeElements() {
+                // Controles
+                this.startBtn = document.getElementById('startBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                
+                // UI
+                this.status = document.getElementById('status');
+                this.timer = document.getElementById('timer');
+                this.previewContainer = document.getElementById('previewContainer');
+                this.previewVideo = document.getElementById('previewVideo');
+                this.previewPlaceholder = document.getElementById('previewPlaceholder');
+                this.recordingIndicator = document.getElementById('recordingIndicator');
+                
+                // Configuración
+                this.videoQuality = document.getElementById('videoQuality');
+                this.videoFormat = document.getElementById('videoFormat');
+                this.videoBitrate = document.getElementById('videoBitrate');
+                this.captureSystemAudio = document.getElementById('captureSystemAudio');
+                this.captureMicrophone = document.getElementById('captureMicrophone');
+                this.suppressEcho = document.getElementById('suppressEcho');
+                this.microphoneDevice = document.getElementById('microphoneDevice');
+                this.filenameInput = document.getElementById('filename');
+                this.autoSave = document.getElementById('autoSave');
+                this.showCountdown = document.getElementById('showCountdown');
+                this.toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
+
+                // Estadísticas y Descargas
+                this.stats = document.getElementById('stats');
+                this.fileSizeElement = document.getElementById('fileSize');
+                this.fpsElement = document.getElementById('fps');
+                this.bitrateElement = document.getElementById('bitrate');
+                this.downloadsContainer = document.getElementById('downloadsContainer');
+                this.downloadList = document.getElementById('downloadList');
+                this.downloadsHeaderActions = document.getElementById('downloadsHeaderActions');
+                this.downloadAllBtn = document.getElementById('downloadAllBtn');
+                this.deleteAllBtn = document.getElementById('deleteAllBtn');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startRecording());
+                this.pauseBtn.addEventListener('click', () => this.pauseResumeRecording());
+                this.stopBtn.addEventListener('click', () => this.stopRecording());
+                this.toggleAdvancedBtn.addEventListener('click', toggleAdvancedSettings);
+                this.downloadAllBtn.addEventListener('click', () => this.downloadAll());
+                this.deleteAllBtn.addEventListener('click', () => this.deleteAll());
+                
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                        e.preventDefault();
+                        e.returnValue = '¿Estás seguro de que quieres salir? La grabación se perderá.';
+                        return e.returnValue;
+                    }
+                });
+            }
+
+            setupKeyboardShortcuts() {
+                 document.addEventListener('keydown', (e) => {
+                    if (e.key === 'F9') {
+                        e.preventDefault();
+                        if (!this.startBtn.disabled) this.startRecording();
+                        else if (!this.stopBtn.disabled) this.stopRecording();
+                    } else if (e.key === 'F10') {
+                        e.preventDefault();
+                        if (!this.pauseBtn.disabled) this.pauseResumeRecording();
+                    }
+                });
+            }
+
+            checkBrowserSupport() {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    this.updateStatus('Tu navegador no es compatible con la API de grabación de pantalla.', 'error');
+                    this.startBtn.disabled = true;
+                }
+                if (!window.MediaRecorder) {
+                    this.updateStatus('Tu navegador no es compatible con la API de MediaRecorder.', 'error');
+                    this.startBtn.disabled = true;
+                }
+                 if (typeof JSZip === 'undefined') {
+                    console.warn('JSZip no está cargado. La función "Descargar todo" no funcionará.');
+                    this.downloadAllBtn.disabled = true;
+                }
+            }
+
+            async loadMicrophoneDevices() {
+                try {
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+                    
+                    this.microphoneDevice.innerHTML = '<option value="default">Micrófono predeterminado</option>';
+                    audioInputDevices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.textContent = device.label || `Micrófono ${this.microphoneDevice.length}`;
+                        this.microphoneDevice.appendChild(option);
+                    });
+                } catch (error) {
+                    console.warn('No se pudo acceder a los dispositivos de micrófono:', error);
+                }
+            }
+            
+            updateStatus(message, type = '') {
+                this.status.textContent = message;
+                this.status.className = `status ${type}`;
+            }
+
+            async startRecording() {
+                this.startBtn.disabled = true;
+                if (this.showCountdown.checked) {
+                    for (let i = 3; i > 0; i--) {
+                        this.updateStatus(`Comenzando en ${i}...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                try {
+                    const displayMediaOptions = { video: { frameRate: parseInt(this.videoQuality.value), cursor: 'always' }, audio: this.captureSystemAudio.checked };
+                    this.displayStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+                    
+                    let audioTracks = this.displayStream.getAudioTracks();
+
+                    if (this.captureMicrophone.checked) {
+                        const micConstraints = { audio: { deviceId: this.microphoneDevice.value !== 'default' ? { exact: this.microphoneDevice.value } : undefined, echoCancellation: this.suppressEcho.checked, noiseSuppression: this.suppressEcho.checked } };
+                        this.microphoneStream = await navigator.mediaDevices.getUserMedia(micConstraints);
+                        audioTracks = [...audioTracks, ...this.microphoneStream.getAudioTracks()];
+                    }
+
+                    this.combinedStream = new MediaStream([...this.displayStream.getVideoTracks(), ...audioTracks]);
+                    this.previewVideo.srcObject = this.combinedStream;
+                    this.previewContainer.style.display = 'flex';
+                    this.previewPlaceholder.style.display = 'none';
+                    this.recordingIndicator.style.display = 'block';
+
+                    this.recordedChunks = [];
+                    const options = { mimeType: this.videoFormat.value, videoBitsPerSecond: parseInt(this.videoBitrate.value) };
+                    this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
+                    this.mediaRecorder.ondataavailable = event => event.data.size > 0 && this.recordedChunks.push(event.data);
+                    this.mediaRecorder.onstop = this.handleStop.bind(this);
+                    this.mediaRecorder.start(1000);
+
+                    this.displayStream.getVideoTracks()[0].onended = () => this.stopRecording();
+                    
+                    this.updateStatus('¡Grabando!', 'success');
+                    this.startBtn.classList.add('recording');
+                    this.startBtn.querySelector('span').textContent = '🔴';
+                    this.pauseBtn.disabled = false;
+                    this.stopBtn.disabled = false;
+                    this.timer.style.display = 'block';
+                    this.stats.style.display = 'grid';
+                    this.startTimer();
+                    this.startStats();
+                } catch (error) {
+                    this.updateStatus(`Error: ${error.message}`, 'error');
+                    this.resetUI();
+                }
+            }
+
+            pauseResumeRecording() {
+                if (!this.mediaRecorder) return;
+                
+                if (!this.isPaused) {
+                    this.mediaRecorder.pause();
+                    this.isPaused = true;
+                    this.pauseBtn.innerHTML = '<span>▶️</span> Reanudar';
+                    this.updateStatus('Grabación pausada.', 'warning');
+                    this.timePaused = Date.now();
+                    clearInterval(this.timerInterval);
+                } else {
+                    this.mediaRecorder.resume();
+                    this.isPaused = false;
+                    this.pauseBtn.innerHTML = '<span>⏸️</span> Pausar';
+                    this.updateStatus('¡Grabando!', 'success');
+                    this.pausedTime += Date.now() - this.timePaused;
+                    this.startTimer(true);
+                }
+            }
+
+            stopRecording() {
+                if (this.mediaRecorder?.state !== 'inactive') this.mediaRecorder.stop();
+                [this.combinedStream, this.displayStream, this.microphoneStream].forEach(s => s?.getTracks().forEach(t => t.stop()));
+                this.updateStatus('Procesando grabación...', 'success');
+                this.stopTimer();
+                this.stopStats();
+                this.resetUI();
+            }
+
+            handleStop() {
+                const mimeType = this.recordedChunks[0]?.type || this.videoFormat.value.split(';')[0];
+                const fileExtension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const filename = `${this.filenameInput.value}_${new Date().toISOString().replace(/[:.]/g, '-')}.${fileExtension}`;
+                const blob = new Blob(this.recordedChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                this.recordedBlobs.set(url, { blob, filename });
+                this.addDownloadToList(url, filename, blob.size);
+
+                if (this.autoSave.checked) {
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+
+                this.updateStatus('Grabación finalizada y guardada.', 'success');
+                this.recordedChunks = [];
+            }
+            
+            addDownloadToList(url, filename, size) {
+                this.downloadsContainer.style.display = 'block';
+                this.downloadsHeaderActions.style.display = 'flex';
+                const item = document.createElement('div');
+                item.className = 'download-item';
+                item.dataset.url = url;
+                
+                item.innerHTML = `
+                    <div class="download-info">
+                        <div class="download-name">${filename}</div>
+                        <div class="download-details">
+                            <span>💾 ${(size / 1024 / 1024).toFixed(2)} MB</span>
+                            <span>⏱️ ${this.timer.textContent}</span>
+                            <span>📅 ${new Date().toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="download-actions">
+                        <a href="${url}" download="${filename}" class="download-link"><span>📥</span> Descargar</a>
+                        <button class="delete-btn"><span>🗑️</span> Eliminar</button>
+                    </div>
+                `;
+                
+                item.querySelector('.delete-btn').addEventListener('click', () => {
+                    this.recordedBlobs.delete(url);
+                    URL.revokeObjectURL(url);
+                    item.remove();
+                    if (this.downloadList.children.length === 0) {
+                        this.downloadsContainer.style.display = 'none';
+                        this.downloadsHeaderActions.style.display = 'none';
+                    }
+                });
+
+                this.downloadList.prepend(item);
+            }
+            
+            async downloadAll() {
+                if (this.recordedBlobs.size === 0) return;
+                const originalText = this.downloadAllBtn.innerHTML;
+                this.downloadAllBtn.innerHTML = `<span><div class="loading"></div></span> Comprimiendo...`;
+                this.downloadAllBtn.disabled = true;
+
+                try {
+                    const zip = new JSZip();
+                    for (const [, { blob, filename }] of this.recordedBlobs) {
+                        zip.file(filename, blob);
+                    }
+
+                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                    const zipUrl = URL.createObjectURL(zipBlob);
+
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = zipUrl;
+                    a.download = 'grabaciones.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(zipUrl);
+                } catch (error) {
+                    console.error("Error al crear el ZIP:", error);
+                    this.updateStatus('Error al comprimir los archivos.', 'error');
+                } finally {
+                    this.downloadAllBtn.innerHTML = originalText;
+                    this.downloadAllBtn.disabled = false;
+                }
+            }
+            
+            deleteAll() {
+                if (this.downloadList.children.length > 0) {
+                    if (confirm('¿Estás seguro de que quieres eliminar TODAS las grabaciones de la lista?')) {
+                        this.downloadList.querySelectorAll('.download-item').forEach(item => {
+                            const url = item.dataset.url;
+                            this.recordedBlobs.delete(url);
+                            URL.revokeObjectURL(url);
+                        });
+                        this.downloadList.innerHTML = '';
+                        this.downloadsContainer.style.display = 'none';
+                        this.downloadsHeaderActions.style.display = 'none';
+                    }
+                }
+            }
+
+            resetUI() {
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                this.stopBtn.disabled = true;
+                this.startBtn.classList.remove('recording');
+                this.startBtn.querySelector('span').textContent = '▶️';
+                this.pauseBtn.innerHTML = '<span>⏸️</span> Pausar';
+                this.isPaused = false;
+                this.previewVideo.srcObject = null;
+                this.previewContainer.style.display = 'none';
+                this.previewPlaceholder.style.display = 'block';
+                this.recordingIndicator.style.display = 'none';
+                this.timer.style.display = 'none';
+                this.stats.style.display = 'none';
+                this.combinedStream = this.displayStream = this.microphoneStream = null;
+            }
+
+            startTimer(isResuming = false) {
+                 if (!isResuming) {
+                    this.startTime = Date.now();
+                    this.pausedTime = 0;
+                }
+                this.timerInterval = setInterval(() => {
+                    const elapsedSeconds = Math.floor((Date.now() - this.startTime - this.pausedTime) / 1000);
+                    this.timer.textContent = this.formatTime(elapsedSeconds);
+                }, 1000);
+            }
+
+            stopTimer() {
+                clearInterval(this.timerInterval);
+            }
+
+            formatTime(s) {
+                return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+            }
+
+            startStats() {
+                this.fpsElement.textContent = this.videoQuality.value;
+                this.bitrateElement.textContent = (parseInt(this.videoBitrate.value, 10) / 1000).toLocaleString();
+                
+                this.statsInterval = setInterval(() => {
+                    if (this.recordedChunks.length > 0) {
+                        const totalSize = this.recordedChunks.reduce((acc, chunk) => acc + chunk.size, 0);
+                        this.fileSizeElement.textContent = `${(totalSize / 1024 / 1024).toFixed(2)} MB`;
+                    }
+                }, 1000);
+            }
+
+            stopStats() {
+                clearInterval(this.statsInterval);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ScreenRecorderPro();
+        });
+    </script>
+</body>
+</html>

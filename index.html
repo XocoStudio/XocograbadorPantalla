@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabador de Pantalla Pro</title>
+    <!-- Librerías para FFMPEG (recorte/gif) y JSZip (descargar todo) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #667eea 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; padding: 20px; }
+        .container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); border-radius: 20px; padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .app-icon { width: 80px; height: 80px; background: linear-gradient(45deg, #ff6b6b, #ee5a24); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 32px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        h1 { margin-bottom: 10px; font-size: 2.2em; font-weight: 300; }
+        .subtitle { opacity: 0.8; font-size: 1.1em; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+        @media (max-width: 768px) { .main-content { grid-template-columns: 1fr; gap: 20px; } }
+        .controls-section, .preview-section { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .section-title { font-size: 1.3em; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        .btn { background: linear-gradient(45deg, #4ecdc4, #44a08d); border: none; color: white; padding: 15px 25px; font-size: 16px; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); }
+        .btn.recording { background: linear-gradient(45deg, #ff6b6b, #ee5a24); animation: pulse 1.5s infinite; }
+        .btn.pause { background: linear-gradient(45deg, #f39c12, #e67e22); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .status { padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; font-size: 14px; margin: 15px 0; text-align: center; }
+        .timer { font-size: 2em; font-weight: 600; color: #ff6b6b; text-align: center; margin: 15px 0; font-family: 'Courier New', monospace; }
+        .preview-container { border-radius: 10px; overflow: hidden; background: rgba(0, 0, 0, 0.3); min-height: 200px; display: none; align-items: center; justify-content: center; position: relative; }
+        .preview-video { width: 100%; border-radius: 10px; }
+        .recording-indicator { position: absolute; top: 10px; right: 10px; background: #ff6b6b; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; display: none; }
+        .settings { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 20px; }
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .setting-group { margin: 15px 0; }
+        .setting-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; }
+        .setting-group select, .setting-group input, .setting-group textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; transition: all 0.3s ease; }
+        .setting-group select:focus, .setting-group input:focus, .setting-group textarea:focus { outline: none; border-color: #4ecdc4; box-shadow: 0 0 10px rgba(78, 205, 196, 0.3); }
+        .setting-group select option { background: #333; color: white; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+        .checkbox-group input[type="checkbox"] { width: auto; accent-color: #4ecdc4; transform: scale(1.2); }
+        .info-icon { font-size: 12px; cursor: pointer; opacity: 0.7; transition: opacity 0.3s; }
+        .info-icon:hover { opacity: 1; }
+        .downloads { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); display: none; }
+        .downloads-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;}
+        .downloads-header-actions { display: none; gap: 10px; }
+        .batch-action-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 8px 15px; font-size: 12px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 5px; }
+        .batch-action-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .download-item { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s ease; flex-wrap: wrap; }
+        .download-item:hover { background: rgba(255, 255, 255, 0.15); }
+        .download-info { flex: 1; margin-right: 15px; word-break: break-all; min-width: 200px; }
+        .download-name { font-weight: 500; margin-bottom: 5px; }
+        .download-details { font-size: 12px; opacity: 0.7; display: flex; gap: 15px; flex-wrap: wrap; }
+        .download-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .download-link, .delete-btn, .trim-btn, .gif-btn { color: white; text-decoration: none; padding: 8px 15px; border-radius: 20px; font-size: 12px; font-weight: 500; transition: all 0.3s ease; border: none; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .download-link { background: #4ecdc4; }
+        .delete-btn { background: #ff6b6b; }
+        .trim-btn { background: #667eea; }
+        .gif-btn { background: #f39c12; }
+        .download-link:hover { background: #44a08d; transform: translateY(-2px); }
+        .delete-btn:hover { background: #ee5a24; transform: translateY(-2px); }
+        .trim-btn:hover { background: #5a67d8; transform: translateY(-2px); }
+        .gif-btn:hover { background: #e67e22; transform: translateY(-2px); }
+        .error { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); }
+        .success { background: rgba(78, 205, 196, 0.2); color: #4ecdc4; border: 1px solid rgba(78, 205, 196, 0.3); }
+        .warning { background: rgba(243, 156, 18, 0.2); color: #f39c12; border: 1px solid rgba(243, 156, 18, 0.3); }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: 600; color: #4ecdc4; }
+        .stat-label { font-size: 12px; opacity: 0.7; margin-top: 5px; }
+        .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .advanced-settings { display: none; margin-top: 20px; }
+        .toggle-advanced { background: none; border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 14px; margin: 10px 0; transition: all 0.3s ease; }
+        .toggle-advanced:hover { background: rgba(255, 255, 255, 0.1); }
+        
+        /* Estilos para Modales */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); width: 90%; color: #fff; }
+        .trim-modal { max-width: 900px; }
+        .gif-modal { max-width: 500px; }
+        .modal h2 { margin-bottom: 20px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }
+        .modal-status { margin-top: 15px; text-align: center; display: none; }
+        .modal-status .loading { width: 20px; height: 20px; margin-right: 10px; vertical-align: middle; }
+        
+        /* Estilos específicos del Modal de Recorte */
+        .trim-video-preview { width: 100%; max-height: 400px; background: #000; border-radius: 10px; margin-bottom: 20px; }
+        .timeline-container { position: relative; width: 100%; height: 60px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 0 15px; display: flex; align-items: center; touch-action: none; }
+        .timeline-frames { width: 100%; height: 50px; border-radius: 8px; }
+        .trim-range { position: absolute; top: 0; left: 15px; right: 15px; bottom: 0; }
+        .trim-handle { position: absolute; top: -5px; width: 20px; height: 70px; background: rgba(78, 205, 196, 0.8); border: 2px solid #4ecdc4; border-radius: 8px; cursor: ew-resize; z-index: 2; }
+        .trim-handle::after { content: '||'; position: absolute; left: 3px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.7); font-size: 12px; }
+        .handle-start { left: -2px; }
+        .handle-end { right: -2px; }
+        .trim-mask { position: absolute; top: 0; height: 100%; background: rgba(20, 30, 50, 0.7); z-index: 1; }
+        .mask-start { left: 0; }
+        .mask-end { right: 0; }
+        .trim-info { display: flex; justify-content: space-between; margin-top: 15px; font-family: monospace; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="app-icon">🎥</div>
+            <h1>Grabador de Pantalla Pro</h1>
+            <p class="subtitle">Captura profesional de pantalla con audio y configuraciones avanzadas</p>
+        </div>
+
+        <div class="main-content">
+            <div class="controls-section">
+                <h3 class="section-title">🎮 Controles de Grabación</h3>
+                <div class="controls">
+                    <button id="startBtn" class="btn"><span>▶️</span> Iniciar Grabación</button>
+                    <button id="pauseBtn" class="btn pause" disabled><span>⏸️</span> Pausar</button>
+                    <button id="stopBtn" class="btn" disabled><span>⏹️</span> Detener</button>
+                </div>
+                <div class="timer" id="timer" style="display: none;">00:00</div>
+                <div class="status" id="status">✨ Listo para grabar. Configura las opciones y haz clic en "Iniciar Grabación".</div>
+            </div>
+            <div class="preview-section">
+                <h3 class="section-title">👁️ Vista Previa</h3>
+                <div class="preview-container" id="previewContainer">
+                    <video id="previewVideo" class="preview-video" autoplay muted></video>
+                    <div class="recording-indicator" id="recordingIndicator">🔴 GRABANDO</div>
+                </div>
+                <div style="text-align: center; padding: 40px; opacity: 0.6;" id="previewPlaceholder">
+                    <div style="font-size: 48px; margin-bottom: 20px;">📺</div>
+                    <p>La vista previa aparecerá aquí durante la grabación</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings">
+            <h3 class="section-title">⚙️ Configuración de Grabación</h3>
+            <h4 style="margin: 25px 0 15px 0;">📁 Configuración de Archivo</h4>
+            <div class="setting-group">
+                <label for="filename">📝 Nombre base del archivo:</label>
+                <input type="text" id="filename" placeholder="grabacion_pantalla" value="grabacion_pantalla">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoSave" checked>
+                <label for="autoSave">Guardar automáticamente al detener</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="showCountdown" checked>
+                <label for="showCountdown">Mostrar cuenta regresiva de 3 segundos</label>
+            </div>
+            <button class="toggle-advanced" id="toggleAdvancedBtn">⚡ Mostrar configuración avanzada</button>
+        </div>
+
+        <div class="advanced-settings" id="advancedSettings">
+            <h4 style="margin: 20px 0 15px 0;">⚡ Configuración Avanzada</h4>
+            <div class="checkbox-group">
+                <input type="checkbox" id="enableEditing">
+                <label for="enableEditing">Habilitar funciones de edición (Recorte y GIF)</label>
+                <span class="info-icon" id="editingInfo">(i)</span>
+            </div>
+        </div>
+
+        <div class="downloads" id="downloadsContainer">
+            <div class="downloads-header">
+                <h3 class="section-title" style="margin-bottom: 0;">📁 Archivos Grabados</h3>
+                <div class="downloads-header-actions" id="downloadsHeaderActions">
+                    <button class="batch-action-btn" id="downloadAllBtn"><span>📦</span> Descargar Todo</button>
+                    <button class="batch-action-btn" id="deleteAllBtn"><span>🗑️</span> Eliminar Todo</button>
+                </div>
+            </div>
+            <div id="downloadList"></div>
+        </div>
+    </div>
+
+    <!-- Modal para Recortar Video -->
+    <div class="modal-overlay" id="trimModalOverlay">
+        <div class="modal trim-modal">
+            <h2>✂️ Recortar Video</h2>
+            <video class="trim-video-preview" id="trimVideoPreview" controls></video>
+            <div class="timeline-container">
+                <canvas class="timeline-frames" id="timelineCanvas"></canvas>
+                <div class="trim-range" id="trimRange">
+                    <div class="trim-mask mask-start" id="maskStart"></div>
+                    <div class="trim-handle handle-start" id="handleStart"></div>
+                    <div class="trim-handle handle-end" id="handleEnd"></div>
+                    <div class="trim-mask mask-end" id="maskEnd"></div>
+                </div>
+            </div>
+            <div class="trim-info">
+                <span id="startTimeDisplay">Inicio: 00:00.0</span>
+                <span id="newDurationDisplay">Duración: 00:00.0</span>
+                <span id="endTimeDisplay">Fin: 00:00.0</span>
+            </div>
+            <div class="modal-status" id="trimStatus"></div>
+            <div class="modal-actions">
+                <button class="btn pause" id="cancelTrimBtn">Cancelar</button>
+                <button class="btn" id="saveTrimBtn"><span>💾</span> Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para Exportar a GIF -->
+    <div class="modal-overlay" id="gifModalOverlay">
+        <div class="modal gif-modal">
+            <h2>🎨 Exportar a GIF</h2>
+            <p style="opacity: 0.8; margin-bottom: 20px;">Ajusta la configuración para optimizar el tamaño y la calidad del GIF.</p>
+            <div class="setting-group">
+                <label for="gifWidth">Ancho del GIF (px):</label>
+                <select id="gifWidth">
+                    <option value="320">320px (Pequeño)</option>
+                    <option value="480" selected>480px (Mediano)</option>
+                    <option value="640">640px (Grande)</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="gifFps">Fotogramas por Segundo (FPS):</label>
+                <select id="gifFps">
+                    <option value="10">10 FPS (Básico)</option>
+                    <option value="15" selected>15 FPS (Recomendado)</option>
+                    <option value="20">20 FPS (Fluido)</option>
+                </select>
+            </div>
+            <div class="modal-status" id="gifStatus"></div>
+            <div class="modal-actions">
+                <button class="btn pause" id="cancelGifBtn">Cancelar</button>
+                <button class="btn" id="createGifBtn"><span>✨</span> Crear GIF</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleAdvancedSettings() {
+            const advancedSettings = document.getElementById('advancedSettings');
+            const toggleButton = document.getElementById('toggleAdvancedBtn');
+            if (advancedSettings.style.display === 'none' || advancedSettings.style.display === '') {
+                advancedSettings.style.display = 'block';
+                toggleButton.textContent = '⚡ Ocultar configuración avanzada';
+            } else {
+                advancedSettings.style.display = 'none';
+                toggleButton.textContent = '⚡ Mostrar configuración avanzada';
+            }
+        }
+
+        class ScreenRecorderPro {
+            constructor() {
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.displayStream = null;
+                this.combinedStream = null;
+                this.startTime = null;
+                this.timerInterval = null;
+                this.isPaused = false;
+                this.pausedTime = 0;
+                this.timePaused = 0;
+                this.ffmpeg = null;
+                this.isFFmpegLoaded = false;
+                this.recordedBlobs = new Map();
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.initializeSettings();
+            }
+             
+            initializeElements() {
+                // Controles
+                this.startBtn = document.getElementById('startBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                // UI
+                this.status = document.getElementById('status');
+                this.timer = document.getElementById('timer');
+                this.previewContainer = document.getElementById('previewContainer');
+                this.previewVideo = document.getElementById('previewVideo');
+                this.previewPlaceholder = document.getElementById('previewPlaceholder');
+                this.recordingIndicator = document.getElementById('recordingIndicator');
+                // Configuración
+                this.filenameInput = document.getElementById('filename');
+                this.autoSave = document.getElementById('autoSave');
+                this.showCountdown = document.getElementById('showCountdown');
+                this.toggleAdvancedBtn = document.getElementById('toggleAdvancedBtn');
+                this.enableEditing = document.getElementById('enableEditing');
+                this.editingInfo = document.getElementById('editingInfo');
+                // Descargas
+                this.downloadsContainer = document.getElementById('downloadsContainer');
+                this.downloadList = document.getElementById('downloadList');
+                this.downloadsHeaderActions = document.getElementById('downloadsHeaderActions');
+                this.downloadAllBtn = document.getElementById('downloadAllBtn');
+                this.deleteAllBtn = document.getElementById('deleteAllBtn');
+                // Modal de Recorte
+                this.trimModalOverlay = document.getElementById('trimModalOverlay');
+                this.trimVideoPreview = document.getElementById('trimVideoPreview');
+                this.timelineCanvas = document.getElementById('timelineCanvas');
+                this.handleStart = document.getElementById('handleStart');
+                this.handleEnd = document.getElementById('handleEnd');
+                this.maskStart = document.getElementById('maskStart');
+                this.maskEnd = document.getElementById('maskEnd');
+                this.startTimeDisplay = document.getElementById('startTimeDisplay');
+                this.endTimeDisplay = document.getElementById('endTimeDisplay');
+                this.newDurationDisplay = document.getElementById('newDurationDisplay');
+                this.cancelTrimBtn = document.getElementById('cancelTrimBtn');
+                this.saveTrimBtn = document.getElementById('saveTrimBtn');
+                this.trimStatus = document.getElementById('trimStatus');
+                // Modal de GIF
+                this.gifModalOverlay = document.getElementById('gifModalOverlay');
+                this.gifWidth = document.getElementById('gifWidth');
+                this.gifFps = document.getElementById('gifFps');
+                this.createGifBtn = document.getElementById('createGifBtn');
+                this.cancelGifBtn = document.getElementById('cancelGifBtn');
+                this.gifStatus = document.getElementById('gifStatus');
+            }
+             
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startRecording());
+                this.pauseBtn.addEventListener('click', () => this.pauseResumeRecording());
+                this.stopBtn.addEventListener('click', () => this.stopRecording());
+                this.toggleAdvancedBtn.addEventListener('click', toggleAdvancedSettings);
+                this.downloadAllBtn.addEventListener('click', () => this.downloadAll());
+                this.deleteAllBtn.addEventListener('click', () => this.deleteAll());
+                this.enableEditing.addEventListener('change', (e) => this.toggleEditingFeatures(e.target.checked));
+                this.editingInfo.addEventListener('click', this.showEditingInfo);
+            }
+            
+            initializeSettings() {
+                setTimeout(() => {
+                    const editingEnabled = localStorage.getItem('editingEnabled') === 'true';
+                    this.enableEditing.checked = editingEnabled;
+                    this.toggleEditingFeatures(editingEnabled, true);
+                }, 0);
+            }
+
+            toggleEditingFeatures(isEnabled, isInitial = false) {
+                if (!isInitial) {
+                    localStorage.setItem('editingEnabled', isEnabled);
+                }
+                document.querySelectorAll('.trim-btn, .gif-btn').forEach(btn => {
+                    btn.style.display = isEnabled ? 'flex' : 'none';
+                });
+            }
+            
+            showEditingInfo() {
+                alert(
+                    "Información sobre las Funciones de Edición (Recorte y GIF):\n\n" +
+                    "1. ¿Qué es FFMPEG.wasm?\n" +
+                    "Es una poderosa librería de video que se ejecuta en su navegador. Es segura y procesa todo localmente.\n\n" +
+                    "2. Almacenamiento en Caché:\n" +
+                    "Su navegador descarga este archivo (aprox. 30 MB) la primera vez y lo guarda en su caché para un rendimiento futuro más rápido.\n\n" +
+                    "3. ¿Cómo eliminar el archivo?\n" +
+                    "Para hacerlo, debe limpiar los 'Datos del Sitio' o la 'Caché' para esta página en la configuración de su navegador."
+                );
+            }
+             
+            async startRecording() {
+                this.startBtn.disabled = true;
+                if (this.showCountdown.checked) {
+                    for (let i = 3; i > 0; i--) {
+                        this.updateStatus(`Comenzando en ${i}...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+                try {
+                    const displayMediaOptions = { video: { cursor: 'always' }, audio: true };
+                    this.displayStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+                    this.combinedStream = new MediaStream([...this.displayStream.getVideoTracks(), ...this.displayStream.getAudioTracks()]);
+                    this.previewVideo.srcObject = this.combinedStream;
+                    this.previewContainer.style.display = 'flex';
+                    this.previewPlaceholder.style.display = 'none';
+                    this.recordingIndicator.style.display = 'block';
+                    this.recordedChunks = [];
+                    this.mediaRecorder = new MediaRecorder(this.combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+                    this.mediaRecorder.ondataavailable = event => event.data.size > 0 && this.recordedChunks.push(event.data);
+                    this.mediaRecorder.onstop = this.handleStop.bind(this);
+                    this.mediaRecorder.start(1000);
+                    this.displayStream.getVideoTracks()[0].onended = () => this.stopRecording();
+                    this.updateStatus('¡Grabando!', 'success');
+                    this.startBtn.classList.add('recording');
+                    this.pauseBtn.disabled = false;
+                    this.stopBtn.disabled = false;
+                    this.timer.style.display = 'block';
+                    this.startTimer();
+                } catch (error) {
+                    this.updateStatus(`Error: ${error.message}`, 'error');
+                    this.resetUI();
+                }
+            }
+            
+            pauseResumeRecording() {
+                if (!this.mediaRecorder) return;
+                if (!this.isPaused) {
+                    this.mediaRecorder.pause();
+                    this.isPaused = true;
+                    this.pauseBtn.innerHTML = '<span>▶️</span> Reanudar';
+                    this.updateStatus('Grabación pausada.', 'warning');
+                    this.timePaused = Date.now();
+                    clearInterval(this.timerInterval);
+                } else {
+                    this.mediaRecorder.resume();
+                    this.isPaused = false;
+                    this.pauseBtn.innerHTML = '<span>⏸️</span> Pausar';
+                    this.updateStatus('¡Grabando!', 'success');
+                    this.pausedTime += Date.now() - this.timePaused;
+                    this.startTimer(true);
+                }
+            }
+            
+            stopRecording() {
+                if (this.mediaRecorder?.state !== 'inactive') this.mediaRecorder.stop();
+                [this.combinedStream, this.displayStream].forEach(s => s?.getTracks().forEach(t => t.stop()));
+                this.updateStatus('Procesando grabación...', 'success');
+                this.stopTimer();
+                this.resetUI();
+            }
+            
+            handleStop() {
+                const mimeType = this.recordedChunks[0]?.type || 'video/webm';
+                const fileExtension = 'webm';
+                const filename = `${this.filenameInput.value}_${new Date().toISOString().replace(/[:.]/g, '-')}.${fileExtension}`;
+                const blob = new Blob(this.recordedChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                this.recordedBlobs.set(url, { blob, filename });
+                this.addDownloadToList(url, filename, blob.size);
+                if (this.autoSave.checked) {
+                    const a = document.createElement('a');
+                    a.style.display = 'none'; a.href = url; a.download = filename;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                }
+                this.updateStatus('Grabación finalizada y guardada.', 'success');
+                this.recordedChunks = [];
+            }
+            
+            addDownloadToList(url, filename, size) {
+                this.downloadsContainer.style.display = 'block';
+                this.downloadsHeaderActions.style.display = 'flex';
+                const item = document.createElement('div');
+                item.className = 'download-item';
+                item.dataset.url = url;
+                const isEditingEnabled = this.enableEditing.checked;
+                item.innerHTML = `
+                    <div class="download-info">
+                        <div class="download-name">${filename}</div>
+                        <div class="download-details">
+                            <span>💾 ${(size / 1024 / 1024).toFixed(2)} MB</span>
+                            <span class="duration-display">⏱️ ${this.timer.textContent}</span>
+                            <span>📅 ${new Date().toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="download-actions">
+                        <button class="trim-btn" style="display: ${isEditingEnabled ? 'flex' : 'none'};"><span>✂️</span> Recortar</button>
+                        <button class="gif-btn" style="display: ${isEditingEnabled ? 'flex' : 'none'};"><span>🎨</span> Exportar GIF</button>
+                        <a href="${url}" download="${filename}" class="download-link"><span>📥</span> Descargar</a>
+                        <button class="delete-btn"><span>🗑️</span> Eliminar</button>
+                    </div>
+                `;
+                item.querySelector('.delete-btn').addEventListener('click', () => {
+                    this.recordedBlobs.delete(url); URL.revokeObjectURL(url); item.remove();
+                    if (this.downloadList.children.length === 0) {
+                        this.downloadsContainer.style.display = 'none';
+                        this.downloadsHeaderActions.style.display = 'none';
+                    }
+                });
+                item.querySelector('.trim-btn').addEventListener('click', () => this.openTrimModal(url, item));
+                item.querySelector('.gif-btn').addEventListener('click', () => this.openGifModal(url));
+                this.downloadList.prepend(item);
+            }
+
+            async downloadAll() {
+                if (this.recordedBlobs.size === 0) return;
+                const originalText = this.downloadAllBtn.innerHTML;
+                this.downloadAllBtn.innerHTML = `<span><div class="loading"></div></span> Comprimiendo...`;
+                this.downloadAllBtn.disabled = true;
+                try {
+                    const zip = new JSZip();
+                    for (const [, { blob, filename }] of this.recordedBlobs) {
+                        zip.file(filename, blob);
+                    }
+                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                    const zipUrl = URL.createObjectURL(zipBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none'; a.href = zipUrl; a.download = 'grabaciones.zip';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(zipUrl);
+                } catch (error) {
+                    this.updateStatus('Error al comprimir los archivos.', 'error');
+                } finally {
+                    this.downloadAllBtn.innerHTML = originalText; this.downloadAllBtn.disabled = false;
+                }
+            }
+            
+            deleteAll() {
+                if (this.downloadList.children.length > 0 && confirm('¿Estás seguro de que quieres eliminar TODAS las grabaciones?')) {
+                    this.downloadList.querySelectorAll('.download-item').forEach(item => {
+                        const url = item.dataset.url;
+                        this.recordedBlobs.delete(url); URL.revokeObjectURL(url);
+                    });
+                    this.downloadList.innerHTML = '';
+                    this.downloadsContainer.style.display = 'none';
+                    this.downloadsHeaderActions.style.display = 'none';
+                }
+            }
+
+            resetUI() {
+                this.startBtn.disabled = false; this.pauseBtn.disabled = true; this.stopBtn.disabled = true;
+                this.startBtn.classList.remove('recording'); this.pauseBtn.innerHTML = '<span>⏸️</span> Pausar';
+                this.isPaused = false; this.previewVideo.srcObject = null;
+                this.previewContainer.style.display = 'none'; this.previewPlaceholder.style.display = 'block';
+                this.recordingIndicator.style.display = 'none'; this.timer.style.display = 'none';
+                this.combinedStream = this.displayStream = null;
+            }
+
+            startTimer(isResuming = false) {
+                if (!isResuming) { this.startTime = Date.now(); this.pausedTime = 0; }
+                this.timerInterval = setInterval(() => {
+                    const elapsedSeconds = Math.floor((Date.now() - this.startTime - this.pausedTime) / 1000);
+                    this.timer.textContent = this.formatTime(elapsedSeconds);
+                }, 1000);
+            }
+
+            stopTimer() { clearInterval(this.timerInterval); }
+
+            formatTime(totalSeconds, showMilliseconds = false) {
+                const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+                const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
+                if (showMilliseconds) {
+                    const ms = Math.floor((totalSeconds - Math.floor(totalSeconds)) * 10).toString();
+                    return `${minutes}:${seconds}.${ms}`;
+                }
+                return `${minutes}:${seconds}`;
+            }
+
+            updateStatus(message, type = '') {
+                this.status.textContent = message;
+                this.status.className = `status ${type}`;
+            }
+
+            async loadFFmpeg(statusElementId) {
+                if (this.isFFmpegLoaded) return true;
+                const statusEl = document.getElementById(statusElementId);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span><div class="loading"></div></span> Cargando editor por primera vez...`;
+                    statusEl.style.display = 'block';
+                }
+                try {
+                    if (!this.ffmpeg) { this.ffmpeg = FFmpeg.createFFmpeg({ log: true }); }
+                    await this.ffmpeg.load();
+                    this.isFFmpegLoaded = true;
+                    if (statusEl) statusEl.style.display = 'none';
+                    return true;
+                } catch (error) {
+                    if (statusEl) statusEl.textContent = 'Error al cargar el editor.';
+                    return false;
+                }
+            }
+            
+            async openTrimModal(url, itemElement) {
+                if (!this.enableEditing.checked) {
+                    alert('Las funciones de edición están desactivadas. Habilítalas en la configuración avanzada.');
+                    return;
+                }
+                this.trimModalOverlay.style.display = 'flex';
+                const ready = await this.loadFFmpeg('trimStatus');
+                if (!ready) return;
+
+                this.trimVideoPreview.src = url;
+                const video = this.trimVideoPreview;
+                let dragging = null;
+
+                video.onloadedmetadata = async () => {
+                    await this.generateTimelinePreview(video);
+                    const duration = video.duration;
+                    const timeline = this.timelineCanvas.parentElement;
+                    let startTime = 0; let endTime = duration;
+
+                    const updateUI = () => {
+                        const startPercent = (startTime / duration) * 100;
+                        const endPercent = (endTime / duration) * 100;
+                        this.handleStart.style.left = `calc(${startPercent}% - 2px)`;
+                        this.handleEnd.style.left = `calc(${endPercent}% - 18px)`;
+                        this.maskStart.style.width = `${startPercent}%`;
+                        this.maskEnd.style.width = `${100 - endPercent}%`;
+                        this.startTimeDisplay.textContent = `Inicio: ${this.formatTime(startTime, true)}`;
+                        this.endTimeDisplay.textContent = `Fin: ${this.formatTime(endTime, true)}`;
+                        this.newDurationDisplay.textContent = `Duración: ${this.formatTime(endTime - startTime, true)}`;
+                    };
+                    
+                    const onPointerMove = (e) => {
+                        if (!dragging) return; e.preventDefault();
+                        const rect = timeline.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                        const time = (percent / 100) * duration;
+                        if (dragging === 'start') { startTime = Math.min(time, endTime - 0.1); video.currentTime = startTime; } 
+                        else { endTime = Math.max(time, startTime + 0.1); video.currentTime = endTime; }
+                        updateUI();
+                    };
+                    
+                    const onPointerUp = () => {
+                        dragging = null;
+                        document.removeEventListener('pointermove', onPointerMove);
+                        document.removeEventListener('pointerup', onPointerUp);
+                    };
+
+                    const onPointerDown = (e, handle) => {
+                        dragging = handle;
+                        document.addEventListener('pointermove', onPointerMove);
+                        document.addEventListener('pointerup', onPointerUp);
+                    };
+
+                    this.handleStart.onpointerdown = (e) => onPointerDown(e, 'start');
+                    this.handleEnd.onpointerdown = (e) => onPointerDown(e, 'end');
+
+                    this.cancelTrimBtn.onclick = () => { this.trimModalOverlay.style.display = 'none'; video.src = ''; };
+                    this.saveTrimBtn.onclick = async () => await this.trimVideo(url, startTime, endTime, itemElement);
+                    updateUI();
+                };
+            }
+
+            async generateTimelinePreview(video) {
+                const canvas = this.timelineCanvas;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr;
+                ctx.scale(dpr, dpr);
+                const thumbWidth = 80, thumbHeight = 50;
+                const numThumbs = Math.floor(canvas.clientWidth / thumbWidth);
+                const interval = video.duration / numThumbs;
+                this.trimStatus.innerHTML = 'Generando vista previa de la línea de tiempo...';
+                this.trimStatus.style.display = 'block';
+                const tempVideo = document.createElement('video'); tempVideo.src = video.src; tempVideo.muted = true;
+                for (let i = 0; i < numThumbs; i++) {
+                    await new Promise(resolve => {
+                        tempVideo.onseeked = () => { ctx.drawImage(tempVideo, i * thumbWidth, 0, thumbWidth, thumbHeight); resolve(); };
+                        tempVideo.currentTime = i * interval;
+                    });
+                }
+                this.trimStatus.style.display = 'none';
+            }
+            
+            async trimVideo(url, startTime, endTime, itemElement) {
+                const originalText = this.saveTrimBtn.innerHTML;
+                this.saveTrimBtn.innerHTML = `<span><div class="loading"></div></span> Procesando...`;
+                this.saveTrimBtn.disabled = true; this.cancelTrimBtn.disabled = true;
+                this.trimStatus.innerHTML = 'Recortando video, por favor espera...';
+                this.trimStatus.style.display = 'block';
+                try {
+                    const { blob: originalBlob, filename } = this.recordedBlobs.get(url);
+                    const fileExtension = filename.split('.').pop();
+                    const inputFilename = `input.${fileExtension}`;
+                    this.ffmpeg.FS('writeFile', inputFilename, await FFmpeg.fetchFile(originalBlob));
+                    await this.ffmpeg.run('-i', inputFilename, '-ss', this.formatTime(startTime), '-to', this.formatTime(endTime), '-c', 'copy', `output.${fileExtension}`);
+                    const data = this.ffmpeg.FS('readFile', `output.${fileExtension}`);
+                    const newBlob = new Blob([data.buffer], { type: originalBlob.type });
+                    const newUrl = URL.createObjectURL(newBlob);
+                    const newFilename = filename.replace(`.${fileExtension}`, `-recortado.${fileExtension}`);
+                    this.recordedBlobs.delete(url); URL.revokeObjectURL(url);
+                    this.recordedBlobs.set(newUrl, { blob: newBlob, filename: newFilename });
+                    itemElement.dataset.url = newUrl;
+                    itemElement.querySelector('.download-name').textContent = newFilename;
+                    itemElement.querySelector('.download-link').href = newUrl;
+                    itemElement.querySelector('.download-link').download = newFilename;
+                    itemElement.querySelector('.download-details > span:first-child').textContent = `💾 ${(newBlob.size / 1024 / 1024).toFixed(2)} MB`;
+                    itemElement.querySelector('.duration-display').textContent = `⏱️ ${this.formatTime(endTime - startTime)}`;
+                    itemElement.querySelector('.trim-btn').onclick = () => this.openTrimModal(newUrl, itemElement);
+                    itemElement.querySelector('.gif-btn').onclick = () => this.openGifModal(newUrl);
+                    this.trimModalOverlay.style.display = 'none'; this.trimVideoPreview.src = '';
+                } catch (error) {
+                    this.trimStatus.textContent = 'Ocurrió un error durante el recorte.';
+                } finally {
+                    this.saveTrimBtn.innerHTML = originalText; this.saveTrimBtn.disabled = false; this.cancelTrimBtn.disabled = false;
+                }
+            }
+            
+            async openGifModal(url) {
+                if (!this.enableEditing.checked) {
+                    alert('Las funciones de edición están desactivadas. Habilítalas en la configuración avanzada.');
+                    return;
+                }
+                this.gifModalOverlay.style.display = 'flex';
+                this.gifStatus.style.display = 'none';
+                this.cancelGifBtn.onclick = () => { this.gifModalOverlay.style.display = 'none'; };
+                this.createGifBtn.onclick = async () => { await this.createGif(url); };
+            }
+
+            async createGif(url) {
+                const originalText = this.createGifBtn.innerHTML;
+                this.createGifBtn.innerHTML = `<span><div class="loading"></div></span>`;
+                this.createGifBtn.disabled = true; this.cancelGifBtn.disabled = true;
+                try {
+                    const ready = await this.loadFFmpeg('gifStatus');
+                    if (!ready) throw new Error("FFMPEG no pudo cargarse.");
+                    this.gifStatus.innerHTML = `<span><div class="loading"></div></span> Convirtiendo a GIF... Esto puede tardar.`;
+                    this.gifStatus.style.display = 'block';
+                    const { blob, filename } = this.recordedBlobs.get(url);
+                    const fileExtension = filename.split('.').pop();
+                    this.ffmpeg.FS('writeFile', `input.${fileExtension}`, await FFmpeg.fetchFile(blob));
+                    const width = this.gifWidth.value;
+                    const fps = this.gifFps.value;
+                    await this.ffmpeg.run('-i', `input.${fileExtension}`, '-vf', `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`, 'output.gif');
+                    const data = this.ffmpeg.FS('readFile', 'output.gif');
+                    this.gifStatus.textContent = '✅ ¡GIF Creado! Descargando...';
+                    const gifBlob = new Blob([data.buffer], { type: 'image/gif' });
+                    const gifUrl = URL.createObjectURL(gifBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none'; a.href = gifUrl; a.download = filename.replace(`.${fileExtension}`, '.gif');
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(gifUrl);
+                    setTimeout(() => { this.gifModalOverlay.style.display = 'none'; }, 2000);
+                } catch (error) {
+                    this.gifStatus.textContent = '❌ Error al crear el GIF.';
+                } finally {
+                    this.createGifBtn.innerHTML = originalText;
+                    this.createGifBtn.disabled = false;
+                    this.cancelGifBtn.disabled = false;
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ScreenRecorderPro();
+        });
+    </script>
+</body>
+</html>
